@@ -72,6 +72,14 @@ func (c *Context) Exec(s string, args ...interface{}) (int64, error) {
 	return ret.RowsAffected()
 }
 
+func (c *Context) Insert(table string, obj interface{}) (int64, error) {
+	return insertOnUpdateBuilder(c, table, nil, obj)
+}
+
+func (c *Context) InsertOnUpdate(table string, updateFields []string, obj interface{}) (int64, error) {
+	return insertOnUpdateBuilder(c, table, updateFields, obj)
+}
+
 func (c *Context) begin() (*Tx, error) {
 	tx, err := c.dao.database.Begin()
 	if err != nil {
