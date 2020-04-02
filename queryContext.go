@@ -1,0 +1,111 @@
+package dao
+
+import (
+	"database/sql"
+	"errors"
+	"reflect"
+)
+
+var (
+	errorRowsData = errors.New("data should be a slice{map/struct}'s pointer")
+	errorRowData  = errors.New("data should be a map/struct's pointer")
+	globalRtCache = &rtCache{list: make(map[reflect.Type]rtStructCache)}
+)
+
+// QueryContext 负责对rows进行转换
+type QueryContext struct {
+	rows    *sql.Rows
+	lastErr error
+}
+
+func CreateQueryContext(rows *sql.Rows, err error) *QueryContext {
+	return &QueryContext{rows: rows, lastErr: err}
+}
+
+// Get 转换单行数据
+// 如果无结果 则返回sql.ErrNoRows
+func (c *QueryContext) Get(obj interface{}) error {
+	if c.lastErr != nil {
+		return c.lastErr
+	}
+
+	defer c.rows.Close()
+	cols, err := c.rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	for !c.rows.Next() {
+		return sql.ErrNoRows
+	}
+
+	v := reflect.ValueOf(obj)
+	if v.Kind() != reflect.Ptr {
+		return errorRowData
+	}
+	// if v.IsNil() {
+	// 	// 自动初始化？
+	// 	v.Set(reflect.Zero(v.Type()))
+	// }
+	v = reflect.Indirect(v)
+
+	switch v.Kind() {
+	case reflect.Map:
+		return scanMap(v, cols, c.rows)
+	case reflect.Struct:
+		return scanStruct(v, cols, c.rows)
+	default:
+		return errorRowData
+	}
+}
+
+// Find 转换多行数据
+// obj 必须是slice类型 如[]struct []map[string]interface{}..
+func (c *QueryContext) Find(obj interface{}) error {
+	if c.lastErr != nil {
+		return c.lastErr
+	}
+	defer c.rows.Close()
+	cols, err := c.rows.Columns()
+	if err != nil {
+		return err
+	}
+	v := reflect.ValueOf(obj)
+	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Slice {
+		return errorRowsData
+	}
+	v = reflect.Indirect(v)
+	// 列表项
+	vitem := v.Type().Elem()
+
+	var onePtr bool
+	if vitem.Kind() == reflect.Ptr {
+		onePtr = true
+		vitem = vitem.Elem()
+	}
+
+	var one reflect.Value
+
+	for c.rows.Next() {
+		switch vitem.Kind() {
+		case reflect.Map:
+			one = reflect.MakeMap(vitem)
+			if err := scanMap(one, cols, c.rows); err != nil {
+				return err
+			}
+		case reflect.Struct:
+			one = reflect.New(vitem).Elem()
+			if err := scanStruct(one, cols, c.rows); err != nil {
+				return err
+			}
+		default:
+			return errorRowsData
+		}
+		if onePtr {
+			v.Set(reflect.Append(v, one.Addr()))
+		} else {
+			v.Set(reflect.Append(v, one))
+		}
+	}
+	return nil
+}
