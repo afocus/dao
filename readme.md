@@ -6,7 +6,7 @@ import "github.com/afocus/dao"
 
 
 func main(){
-    c, _ := dao.New("root:123456@(127.0.0.1:3306)/test?charset=utf8")
+    c, _ := dao.Create("root:123456@(127.0.0.1:3306)/test?charset=utf8")
     s:=c.CreateSession()
 
 
@@ -42,6 +42,8 @@ func main(){
 
     s.Table("user").Count()
     // select count(1) from user
+
+
 
 
     //

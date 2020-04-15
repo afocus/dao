@@ -41,7 +41,8 @@ func (s *Session) GroupBy(v ...string) *Session {
 func (s *Session) Count() (int64, error) {
 	s.Select("count(1) as cnt")
 	x := make(map[string]int64)
-	if err := s.queryCtx().Get(&x); err != nil {
+	_, err := s.queryCtx().Get(&x)
+	if err != nil {
 		return 0, err
 	}
 	return x["cnt"], nil
@@ -62,7 +63,7 @@ func (s *Session) Find(obj interface{}) error {
 	return s.queryCtx().Find(obj)
 }
 
-func (s *Session) Get(obj interface{}) error {
+func (s *Session) Get(obj interface{}) (bool, error) {
 	s.Limit(1)
 	return s.queryCtx().Get(obj)
 }

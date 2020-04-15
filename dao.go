@@ -13,7 +13,7 @@ type Dao struct {
 	logger   Logoutputer
 }
 
-func NewDao(dsn string) (*Dao, error) {
+func Create(dsn string) (*Dao, error) {
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, err

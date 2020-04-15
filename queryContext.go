@@ -24,38 +24,35 @@ func CreateQueryContext(rows *sql.Rows, err error) *QueryContext {
 
 // Get 转换单行数据
 // 如果无结果 则返回sql.ErrNoRows
-func (c *QueryContext) Get(obj interface{}) error {
+func (c *QueryContext) Get(obj interface{}) (bool, error) {
 	if c.lastErr != nil {
-		return c.lastErr
+		return false, c.lastErr
 	}
 
 	defer c.rows.Close()
 	cols, err := c.rows.Columns()
 	if err != nil {
-		return err
-	}
-
-	for !c.rows.Next() {
-		return sql.ErrNoRows
+		return false, err
 	}
 
 	v := reflect.ValueOf(obj)
 	if v.Kind() != reflect.Ptr {
-		return errorRowData
+		return false, errorRowData
 	}
-	// if v.IsNil() {
-	// 	// 自动初始化？
-	// 	v.Set(reflect.Zero(v.Type()))
-	// }
+
+	for !c.rows.Next() {
+		return false, nil
+	}
+
 	v = reflect.Indirect(v)
 
 	switch v.Kind() {
 	case reflect.Map:
-		return scanMap(v, cols, c.rows)
+		return true, scanMap(v, cols, c.rows)
 	case reflect.Struct:
-		return scanStruct(v, cols, c.rows)
+		return true, scanStruct(v, cols, c.rows)
 	default:
-		return errorRowData
+		return true, errorRowData
 	}
 }
 

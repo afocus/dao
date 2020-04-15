@@ -6,7 +6,7 @@ import (
 )
 
 func initDao() *Dao {
-	c, _ := NewDao("root:123456@(127.0.0.1:3306)/test?charset=utf8")
+	c, _ := Create("root:123456@(127.0.0.1:3306)/test?charset=utf8")
 	c.SetLogger(func(s string) { fmt.Println(s) })
 	return c
 }
@@ -26,6 +26,5 @@ func TestInsert(t *testing.T) {
 	s1 := initDao().NewSession()
 
 	var data TA
-	err = s1.Table("t_a").Select("name").Where("name = ?", "aaaabb").Get(&data)
-	fmt.Println(data, err)
+	s1.Table("t_a").Select("name").Where("name = ?", "aaaabb").Get(&data)
 }
