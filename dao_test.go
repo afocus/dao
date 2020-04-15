@@ -5,7 +5,27 @@ import (
 	"testing"
 )
 
-func TestQueryStrParse(t *testing.T) {
-	s, v := placeholderExpansion("select * from t where id in (?) and age>?", []int{10, 20, 5}, 30)
-	fmt.Println(s, v)
+func initDao() *Dao {
+	c, _ := NewDao("root:123456@(127.0.0.1:3306)/test?charset=utf8")
+	c.SetLogger(func(s string) { fmt.Println(s) })
+	return c
+}
+
+func TestInsert(t *testing.T) {
+	type TA struct {
+		ID   int64
+		Name string
+	}
+
+	s := initDao().NewSession()
+	ret, err := s.Table("t_a").Insert(TA{Name: "aaaabb"})
+	fmt.Println(ret, err)
+
+	s.Close()
+
+	s1 := initDao().NewSession()
+
+	var data TA
+	err = s1.Table("t_a").Select("name").Where("name = ?", "aaaabb").Get(&data)
+	fmt.Println(data, err)
 }
