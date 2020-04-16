@@ -180,45 +180,51 @@ func (s *Session) Update(obj interface{}) (int64, error) {
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
-
 	var (
 		keys   []string
 		values []interface{}
 		str    = bytes.NewBuffer(nil)
+		args   = make([]interface{}, 0)
+		qort   = make([]string, 0)
 	)
-
 	switch v.Kind() {
 	case reflect.Map:
 		keys, values = parseMap(v)
 	case reflect.Struct:
 		keys, values = parseStruct(v)
+	default:
+		return 0, errors.New("obj must be struct/map")
 	}
-
 	str.WriteString(fmt.Sprintf("update %s set", s.table))
 
-	if len(s.fields) > 0 {
-		val := make([]interface{}, 0)
-		for _, v := range s.fields {
-			for i, a := range keys {
-				if a == v {
-					str.WriteString(fmt.Sprintf(" %s = ?,", v))
-					val = append(val, values[i])
-					break
+	for i, a := range keys {
+		if v.Kind() == reflect.Struct {
+			// 结构体默认是不更新空字段的
+			rev := reflect.ValueOf(values[i])
+			if rev.IsNil() || rev.IsZero() {
+				// 检测是否cols强制更新该空字段
+				updateIt := false
+				for _, b := range s.fields {
+					if b == a {
+						updateIt = true
+						break
+					}
+				}
+				if !updateIt {
+					continue
 				}
 			}
 		}
-		values = val
-	} else {
-		for _, a := range keys {
-			str.WriteString(fmt.Sprintf(" %s = ?,", a))
-		}
+		qort = append(qort, fmt.Sprintf(" %s = ?", a))
+		args = append(args, values[i])
 	}
-	stro := str.String()
-	stro = stro[:len(stro)-1]
 
 	condstr, condargs := s.cond.Build()
-	values = append(values, condargs...)
-	return s.Exec(stro+condstr, values...)
+
+	str.WriteString(strings.Join(qort, ", "))
+	str.WriteString(condstr)
+
+	return s.Exec(str.String(), append(args, condargs...)...)
 }
 
 func (s *Session) Tx(fn func(*Session) error) error {
