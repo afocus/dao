@@ -53,11 +53,9 @@ func (s *Session) queryCtx() *QueryContext {
 	sqls, sqlv := s.buildQuery()
 	s.logOutput(sqls, sqlv)
 	if s.tx != nil {
-		rows, err := s.tx.Query(sqls, sqlv...)
-		return &QueryContext{lastErr: err, rows: rows}
+		return CreateQueryContext(s.tx.Query(sqls, sqlv...))
 	}
-	rows, err := s.dao.DB().Query(sqls, sqlv...)
-	return &QueryContext{lastErr: err, rows: rows}
+	return CreateQueryContext(s.dao.DB().Query(sqls, sqlv...))
 }
 
 func (s *Session) Find(obj interface{}) error {

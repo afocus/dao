@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	errorRowsData = errors.New("data should be a slice{map/struct}'s pointer")
-	errorRowData  = errors.New("data should be a map/struct's pointer")
-	globalRtCache = &rtCache{list: make(map[reflect.Type]rtStructCache)}
+	errorRowsData  = errors.New("data should be a slice{map/struct}'s pointer")
+	errorRowData   = errors.New("data should be a map/struct's pointer")
+	errorParseData = errors.New("data should be map/struct")
+	globalRtCache  = &rtCache{list: make(map[reflect.Type]rtStructCache)}
 )
 
 // QueryContext 负责对rows进行转换

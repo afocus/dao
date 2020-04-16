@@ -108,16 +108,18 @@ func (s *Session) Insert(obj interface{}) (int64, error) {
 }
 
 func (s *Session) insertBuilder(table string, updatefields []string, obj interface{}) (string, []interface{}, error) {
-	v := reflect.Indirect(reflect.ValueOf(obj))
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	}
+
 	var (
 		fields []string
 		args   []interface{}
 		skipPk = -1
 		sqltpl = "insert into %s(%s) values (%s)"
+		v      = reflect.Indirect(reflect.ValueOf(obj))
 	)
+
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
 
 	switch v.Type().Kind() {
 	case reflect.Struct:
@@ -125,7 +127,7 @@ func (s *Session) insertBuilder(table string, updatefields []string, obj interfa
 	case reflect.Map:
 		fields, args = parseMap(v)
 	default:
-		return "", nil, errorRowData
+		return "", nil, errorParseData
 	}
 
 	quto := make([]string, len(fields))
@@ -193,7 +195,7 @@ func (s *Session) Update(obj interface{}) (int64, error) {
 	case reflect.Struct:
 		keys, values = parseStruct(v)
 	default:
-		return 0, errors.New("obj must be struct/map")
+		return 0, errorParseData
 	}
 	str.WriteString(fmt.Sprintf("update %s set", s.table))
 
@@ -220,7 +222,6 @@ func (s *Session) Update(obj interface{}) (int64, error) {
 	}
 
 	condstr, condargs := s.cond.Build()
-
 	str.WriteString(strings.Join(qort, ", "))
 	str.WriteString(condstr)
 
