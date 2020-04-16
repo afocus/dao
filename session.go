@@ -198,27 +198,39 @@ func (s *Session) Update(obj interface{}) (int64, error) {
 		return 0, errorParseData
 	}
 	str.WriteString(fmt.Sprintf("update %s set", s.table))
-
-	for i, a := range keys {
-		if v.Kind() == reflect.Struct {
-			// 结构体默认是不更新空字段的
-			rev := reflect.ValueOf(values[i])
-			if rev.IsNil() || rev.IsZero() {
-				// 检测是否cols强制更新该空字段
-				updateIt := false
-				for _, b := range s.fields {
-					if b == a {
-						updateIt = true
+	if v.Kind() == reflect.Struct {
+		// 结构体默认是不更新空字段的
+		// 如果要更新请指定cols
+		if len(s.fields) > 0 {
+			for _, a := range s.fields {
+				for i, x := range keys {
+					if x == a {
+						qort = append(qort, fmt.Sprintf(" %s = ?", a))
+						args = append(args, values[i])
 						break
 					}
 				}
-				if !updateIt {
+			}
+		} else {
+			for i, x := range values {
+				rev := reflect.ValueOf(x)
+				if rev.IsNil() || rev.IsZero() {
 					continue
 				}
+				qort = append(qort, fmt.Sprintf(" %s = ?", keys[i]))
+				args = append(args, values[i])
 			}
 		}
-		qort = append(qort, fmt.Sprintf(" %s = ?", a))
-		args = append(args, values[i])
+	} else {
+		// map 更新所有 忽略cols
+		for i, a := range keys {
+			qort = append(qort, fmt.Sprintf(" %s = ?", a))
+			args = append(args, values[i])
+		}
+	}
+
+	if len(qort) == 0 {
+		return 0, errors.New("update field empty")
 	}
 
 	condstr, condargs := s.cond.Build()
@@ -229,6 +241,9 @@ func (s *Session) Update(obj interface{}) (int64, error) {
 }
 
 func (s *Session) Tx(fn func(*Session) error) error {
+	if s.tx != nil {
+		return errors.New("alreay in tx")
+	}
 	tx, err := s.dao.DB().Begin()
 	if err != nil {
 		return err
