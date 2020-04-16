@@ -77,12 +77,12 @@ func (s *Session) reset() {
 	s.fields = nil
 	s.parts = nil
 	s.cond = nil
-	s.tx = nil
+	s.table = ""
 	s.querySrcData = nil
 }
 
 func (s *Session) Exec(query string, args ...interface{}) (int64, error) {
-
+	defer s.reset()
 	var (
 		ret sql.Result
 		err error

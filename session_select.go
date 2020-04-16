@@ -49,6 +49,7 @@ func (s *Session) Count() (int64, error) {
 }
 
 func (s *Session) queryCtx() *QueryContext {
+	defer s.reset()
 	sqls, sqlv := s.buildQuery()
 	s.logOutput(sqls, sqlv)
 	if s.tx != nil {
