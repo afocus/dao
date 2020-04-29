@@ -180,7 +180,7 @@ func (s *Session) Delete() (int64, error) {
 	str := bytes.NewBuffer(nil)
 	str.WriteString(fmt.Sprintf("delete from %s", s.table))
 	if s.indexs != nil {
-		str.WriteString(fmt.Sprintf("use index(%s)", strings.Join(s.indexs, ", ")))
+		str.WriteString(fmt.Sprintf(" use index(%s)", strings.Join(s.indexs, ", ")))
 	}
 	condstr, condargs := s.cond.Build()
 	str.WriteString(condstr)
@@ -213,7 +213,7 @@ func (s *Session) Update(obj interface{}) (int64, error) {
 	}
 	str.WriteString(fmt.Sprintf("update %s set", s.table))
 	if s.indexs != nil {
-		str.WriteString(fmt.Sprintf("use index(%s)", strings.Join(s.indexs, ", ")))
+		str.WriteString(fmt.Sprintf(" use index(%s)", strings.Join(s.indexs, ", ")))
 	}
 	if v.Kind() == reflect.Struct {
 		// 结构体默认是不更新空字段的
