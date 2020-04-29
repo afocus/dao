@@ -13,6 +13,7 @@ import (
 type Session struct {
 	uniq   string
 	dao    *Dao
+	indexs []string
 	table  string
 	fields []string
 	cond   *sessionCond
@@ -63,6 +64,15 @@ func (s *Session) Table(t string) *Session {
 	return s
 }
 
+func (s *Session) UseIndex(index ...string) *Session {
+	if s.indexs == nil {
+		s.indexs = index
+	} else {
+		s.indexs = append(s.indexs, index...)
+	}
+	return s
+}
+
 func (s *Session) Where(query string, args ...interface{}) *Session {
 	s.cond = newSessionCond(query, args...)
 	return s
@@ -77,6 +87,7 @@ func (s *Session) reset() {
 	s.fields = nil
 	s.parts = nil
 	s.cond = nil
+	s.indexs = nil
 	s.table = ""
 	s.querySrcData = nil
 }
@@ -151,7 +162,7 @@ func (s *Session) insertBuilder(table string, updatefields []string, obj interfa
 		args = append(args[:skipPk], args[skipPk+1:]...)
 	}
 
-	query := fmt.Sprintf(sqltpl, table, strings.Join(fields, ","), strings.Join(quto, ","))
+	query := fmt.Sprintf(sqltpl, table, strings.Join(fields, ","), strings.Join(quto, ", "))
 	if len(updatefields) > 0 {
 		query += " on duplicate key update "
 		for _, v := range updatefields {
@@ -168,6 +179,9 @@ func (s *Session) Delete() (int64, error) {
 	}
 	str := bytes.NewBuffer(nil)
 	str.WriteString(fmt.Sprintf("delete from %s", s.table))
+	if s.indexs != nil {
+		str.WriteString(fmt.Sprintf("use index(%s)", strings.Join(s.indexs, ", ")))
+	}
 	condstr, condargs := s.cond.Build()
 	str.WriteString(condstr)
 
@@ -198,6 +212,9 @@ func (s *Session) Update(obj interface{}) (int64, error) {
 		return 0, errorParseData
 	}
 	str.WriteString(fmt.Sprintf("update %s set", s.table))
+	if s.indexs != nil {
+		str.WriteString(fmt.Sprintf("use index(%s)", strings.Join(s.indexs, ", ")))
+	}
 	if v.Kind() == reflect.Struct {
 		// 结构体默认是不更新空字段的
 		// 如果要更新请指定cols

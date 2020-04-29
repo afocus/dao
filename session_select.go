@@ -80,6 +80,9 @@ func (s *Session) buildQuery() (string, []interface{}) {
 	}
 	str := bytes.NewBuffer(nil)
 	str.WriteString(fmt.Sprintf("select %s from %s", cols, s.table))
+	if s.indexs != nil {
+		str.WriteString(fmt.Sprintf("use index(%s)", strings.Join(s.indexs, ", ")))
+	}
 	condstr, condargs := s.cond.Build()
 	str.WriteString(condstr)
 	for _, v := range s.parts {
