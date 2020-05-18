@@ -28,7 +28,7 @@ func (dao *Dao) SetLogger(logger Logoutputer) {
 func (dao *Dao) NewSession(uniq ...string) *Session {
 	s := sessions.Get().(*Session)
 	if len(uniq) > 0 {
-		s.uniq = uniq[0]
+		s.uniq = uniq[0] + " "
 	}
 	s.dao = dao
 	return s
