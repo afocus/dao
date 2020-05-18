@@ -10,7 +10,7 @@ import (
 )
 
 type structFieldInfo struct {
-	i      int
+	name   string
 	isjson bool
 }
 
@@ -19,16 +19,8 @@ type rtCache struct {
 	sync.RWMutex
 }
 
-func (m *rtCache) Get(v reflect.Value) rtStructCache {
+func (m *rtCache) get(v reflect.Value) rtStructCache {
 	t := v.Type()
-	m.RLock()
-	mp, ok := m.list[t]
-	m.RUnlock()
-	if ok {
-		return mp
-	}
-	m.Lock()
-	defer m.Unlock()
 	field := rtStructCache{}
 	for i := 0; i < t.NumField(); i++ {
 		var (
@@ -40,15 +32,20 @@ func (m *rtCache) Get(v reflect.Value) rtStructCache {
 			if tag == "-" {
 				continue
 			}
+			if ft.Anonymous {
+				nestField := m.get(fv)
+				for k, v := range nestField {
+					field[k] = v
+				}
+				continue
+			}
 			var parsejson bool
-
 			if ts := strings.Split(tag, ","); len(ts) == 2 {
 				tag = ts[0]
 				if strings.TrimSpace(ts[1]) == "json" {
 					parsejson = true
 				}
 			}
-
 			if tag == "" {
 				tag = lowUpperString(ft.Name)
 			}
@@ -65,9 +62,23 @@ func (m *rtCache) Get(v reflect.Value) rtStructCache {
 					}
 				}
 			}
-			field[tag] = structFieldInfo{i: i, isjson: parsejson}
+			field[tag] = structFieldInfo{name: ft.Name, isjson: parsejson}
 		}
 	}
+	return field
+}
+
+func (m *rtCache) Get(v reflect.Value) rtStructCache {
+	t := v.Type()
+	m.RLock()
+	mp, ok := m.list[t]
+	m.RUnlock()
+	if ok {
+		return mp
+	}
+	m.Lock()
+	defer m.Unlock()
+	field := m.get(v)
 	m.list[t] = field
 	return field
 }
@@ -111,12 +122,12 @@ func scanStruct(v reflect.Value, cols []string, rows *sql.Rows) error {
 	// tmpbuf 返回的字段数多于结构体的字段数是代替
 	tmpbuf := sql.RawBytes{}
 	// 用于存需要解析json的部分
-	jsondata := map[int]int{}
+	jsondata := map[string]int{}
 
 	defer func() {
 		for k, fi := range jsondata {
 			if x := args[fi]; x != nil {
-				json.Unmarshal(*(x.(*[]byte)), v.Field(k).Addr().Interface())
+				json.Unmarshal(*(x.(*[]byte)), v.FieldByName(k).Addr().Interface())
 			}
 		}
 	}()
@@ -124,9 +135,9 @@ func scanStruct(v reflect.Value, cols []string, rows *sql.Rows) error {
 		if fd, ok := fields[name]; ok {
 			if fd.isjson {
 				args[i] = &[]byte{}
-				jsondata[fd.i] = i
+				jsondata[fd.name] = i
 			} else {
-				args[i] = v.Field(fd.i).Addr().Interface()
+				args[i] = v.FieldByName(fd.name).Addr().Interface()
 			}
 		} else {
 			args[i] = &tmpbuf
@@ -142,7 +153,7 @@ func parseStruct(v reflect.Value) ([]string, []interface{}) {
 		args   []interface{}
 	)
 	for name, f := range fields {
-		val := v.Field(f.i).Interface()
+		val := v.FieldByName(f.name).Interface()
 		names = append(names, name)
 		if f.isjson {
 			b, _ := json.Marshal(val)
