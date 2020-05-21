@@ -33,6 +33,8 @@ type expPart struct {
 	values []string
 }
 
+type Expression string
+
 func ExpPart(name string, v ...string) expPart {
 	return expPart{name: name, values: v}
 }
@@ -241,8 +243,13 @@ func (s *Session) Update(obj interface{}) (int64, error) {
 	} else {
 		// map 更新所有 忽略cols
 		for i, a := range keys {
-			qort = append(qort, fmt.Sprintf(" %s = ?", a))
-			args = append(args, values[i])
+			ex, ok := values[i].(Expression)
+			if ok {
+				qort = append(qort, fmt.Sprintf(" %s = %v", a, ex))
+			} else {
+				qort = append(qort, fmt.Sprintf(" %s = ?", a))
+				args = append(args, values[i])
+			}
 		}
 	}
 
