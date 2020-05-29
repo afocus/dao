@@ -80,6 +80,16 @@ func (s *Session) Where(query string, args ...interface{}) *Session {
 	return s
 }
 
+func (s *Session) And(query string, args ...interface{}) *Session {
+	s.cond.And(query, args...)
+	return s
+}
+
+func (s *Session) Or(query string, args ...interface{}) *Session {
+	s.cond.Or(query, args...)
+	return s
+}
+
 func (s *Session) Cols(field ...string) *Session {
 	s.fields = field
 	return s
