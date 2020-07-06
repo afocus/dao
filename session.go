@@ -76,6 +76,9 @@ func (s *Session) UseIndex(index ...string) *Session {
 }
 
 func (s *Session) Where(query string, args ...interface{}) *Session {
+	if s.cond != nil {
+		return s.And(query, args...)
+	}
 	s.cond = newSessionCond(query, args...)
 	return s
 }
@@ -178,6 +181,9 @@ func (s *Session) insertBuilder(table string, updatefields []string, obj interfa
 	if len(updatefields) > 0 {
 		query += " on duplicate key update "
 		for _, v := range updatefields {
+			if strings.Index(v, "=") != -1 {
+				query += v
+			}
 			query += fmt.Sprintf("`%s` = values(`%s`),", v, v)
 		}
 		query = query[:len(query)-1]
