@@ -183,8 +183,9 @@ func (s *Session) insertBuilder(table string, updatefields []string, obj interfa
 		for _, v := range updatefields {
 			if strings.Index(v, "=") != -1 {
 				query += v
+			} else {
+				query += fmt.Sprintf("`%s` = values(`%s`),", v, v)
 			}
-			query += fmt.Sprintf("`%s` = values(`%s`),", v, v)
 		}
 		query = query[:len(query)-1]
 	}
