@@ -182,7 +182,7 @@ func (s *Session) insertBuilder(table string, updatefields []string, obj interfa
 		query += " on duplicate key update "
 		for _, v := range updatefields {
 			if strings.Index(v, "=") != -1 {
-				query += v
+				query += fmt.Sprintf("%s,", v)
 			} else {
 				query += fmt.Sprintf("`%s` = values(`%s`),", v, v)
 			}
