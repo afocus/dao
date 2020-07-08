@@ -21,17 +21,17 @@ func newSessionCond(query string, args ...interface{}) *sessionCond {
 }
 
 func (s *sessionCond) And(query string, args ...interface{}) {
-	s.addPart("and", query, args...)
+	s.addPart("and", "("+query+")", args...)
 }
 
 func (s *sessionCond) Or(query string, args ...interface{}) {
-	s.addPart("or", query, args...)
+	s.addPart("or", "("+query+")", args...)
 }
 
 func (s *sessionCond) addPart(cmd string, query string, args ...interface{}) {
 	query, args = placeholderExpansion(query, args)
 	s.strb.WriteString(fmt.Sprintf(" %s ", cmd))
-	s.strb.WriteString(fmt.Sprintf("( %s )", query))
+	s.strb.WriteString(fmt.Sprintf(" %s ", query))
 	s.args = append(s.args, args...)
 }
 
