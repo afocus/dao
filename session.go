@@ -230,10 +230,11 @@ func (s *Session) Update(obj interface{}) (int64, error) {
 	default:
 		return 0, errorParseData
 	}
-	str.WriteString(fmt.Sprintf("update %s set", s.table))
+	str.WriteString(fmt.Sprintf("update %s", s.table))
 	if s.indexs != nil {
 		str.WriteString(fmt.Sprintf(" use index(%s)", strings.Join(s.indexs, ", ")))
 	}
+	str.WriteString(" set")
 	if v.Kind() == reflect.Struct {
 		// 结构体默认是不更新空字段的
 		// 如果要更新请指定cols
