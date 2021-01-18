@@ -67,6 +67,11 @@ func (s *Session) Table(t string) *Session {
 }
 
 func (s *Session) UseIndex(index ...string) *Session {
+	for k, v := range index {
+		if !strings.HasPrefix(v, "`") {
+			index[k] = "`" + v + "`"
+		}
+	}
 	if s.indexs == nil {
 		s.indexs = index
 	} else {
