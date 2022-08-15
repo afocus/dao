@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"time"
 )
 
 func (s *Session) Query(query string, args ...interface{}) *Session {
@@ -51,11 +52,16 @@ func (s *Session) Count() (int64, error) {
 func (s *Session) queryCtx() *QueryContext {
 	defer s.reset()
 	sqls, sqlv := s.buildQuery()
-	s.logOutput(sqls, sqlv)
+	begin := time.Now()
+	var result *QueryContext
 	if s.tx != nil {
-		return CreateQueryContext(s.tx.Query(sqls, sqlv...))
+		result = CreateQueryContext(s.tx.Query(sqls, sqlv...))
+	} else {
+		result = CreateQueryContext(s.dao.DB().Query(sqls, sqlv...))
 	}
-	return CreateQueryContext(s.dao.DB().Query(sqls, sqlv...))
+	duration := time.Since(begin)
+	s.logOutput(sqls, sqlv, duration)
+	return result
 }
 
 func (s *Session) Find(obj interface{}) error {
