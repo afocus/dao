@@ -52,7 +52,7 @@ var sessions = &sync.Pool{
 
 func (s *Session) logOutput(query string, args interface{}, duration time.Duration) {
 	if s.dao.logger != nil {
-		str := fmt.Sprintf("%s%s %v", s.uniq, query, args)
+		str := fmt.Sprintf("%s%s %v cost:%v", s.uniq, query, args, duration.Milliseconds())
 		s.dao.logger(str)
 	}
 }
