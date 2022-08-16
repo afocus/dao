@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Session struct {
@@ -49,9 +50,9 @@ var sessions = &sync.Pool{
 	},
 }
 
-func (s *Session) logOutput(query string, args interface{}) {
+func (s *Session) logOutput(query string, args interface{}, duration time.Duration) {
 	if s.dao.logger != nil {
-		str := fmt.Sprintf("%s%s %v", s.uniq, query, args)
+		str := fmt.Sprintf("%s%s %v cost:%v", s.uniq, query, args, duration.Milliseconds())
 		s.dao.logger(str)
 	}
 }
@@ -118,12 +119,14 @@ func (s *Session) Exec(query string, args ...interface{}) (int64, error) {
 		ret sql.Result
 		err error
 	)
-	s.logOutput(query, args)
+	begin := time.Now()
 	if s.tx != nil {
 		ret, err = s.tx.Exec(query, args...)
 	} else {
 		ret, err = s.dao.DB().Exec(query, args...)
 	}
+	duration := time.Since(begin)
+	s.logOutput(query, args, duration)
 	if err != nil {
 		return 0, err
 	}
