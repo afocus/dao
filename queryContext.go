@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"reflect"
+
+	"github.com/afocus/trace"
 )
 
 var (
@@ -17,6 +19,8 @@ var (
 type QueryContext struct {
 	rows    *sql.Rows
 	lastErr error
+	tr      *trace.Trace
+	rowCnt  int
 }
 
 func CreateQueryContext(rows *sql.Rows, err error) *QueryContext {
@@ -46,7 +50,7 @@ func (c *QueryContext) Get(obj interface{}) (bool, error) {
 	}
 
 	v = reflect.Indirect(v)
-
+	c.rowCnt += 1
 	switch v.Kind() {
 	case reflect.Map:
 		return true, scanMap(v, cols, c.rows)
@@ -104,6 +108,7 @@ func (c *QueryContext) Find(obj interface{}) error {
 		} else {
 			v.Set(reflect.Append(v, one))
 		}
+		c.rowCnt++
 	}
 	return nil
 }

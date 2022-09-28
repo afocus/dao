@@ -127,7 +127,7 @@ func scanStruct(v reflect.Value, cols []string, rows *sql.Rows) error {
 	defer func() {
 		for k, fi := range jsondata {
 			if x := args[fi]; x != nil {
-				json.Unmarshal(*(x.(*[]byte)), v.FieldByName(k).Addr().Interface())
+				_ = json.Unmarshal(*(x.(*[]byte)), v.FieldByName(k).Addr().Interface())
 			}
 		}
 	}()
