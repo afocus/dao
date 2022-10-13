@@ -7,7 +7,7 @@ import "github.com/afocus/dao"
 
 func main(){
     c, _ := dao.Create("root:123456@(127.0.0.1:3306)/test?charset=utf8")
-    s:=c.CreateSession()
+    s:=c.NewSession(context.Background())
 
 
 

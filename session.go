@@ -2,16 +2,18 @@ package dao
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/afocus/trace"
 )
 
 type Session struct {
-	uniq   string
 	dao    *Dao
 	indexs []string
 	table  string
@@ -20,6 +22,7 @@ type Session struct {
 	parts  []expPart
 	tx     *sql.Tx
 
+	ctx          context.Context
 	querySrcData *sqlData
 }
 
@@ -47,13 +50,6 @@ var sessions = &sync.Pool{
 	New: func() interface{} {
 		return &Session{}
 	},
-}
-
-func (s *Session) logOutput(query string, args interface{}) {
-	if s.dao.logger != nil {
-		str := fmt.Sprintf("%s%s %v", s.uniq, query, args)
-		s.dao.logger(str)
-	}
 }
 
 func (s *Session) Close() {
@@ -118,16 +114,26 @@ func (s *Session) Exec(query string, args ...interface{}) (int64, error) {
 		ret sql.Result
 		err error
 	)
-	s.logOutput(query, args)
+	e, _ := trace.Start(
+		s.ctx,
+		"Dao Exec "+s.table,
+		trace.Attribute("sql", query),
+		trace.Attribute("args", args),
+	)
 	if s.tx != nil {
 		ret, err = s.tx.Exec(query, args...)
 	} else {
 		ret, err = s.dao.DB().Exec(query, args...)
 	}
 	if err != nil {
+		e.End(err)
 		return 0, err
 	}
-	return ret.RowsAffected()
+	ra, err := ret.RowsAffected()
+	e.SetAttributes(
+		trace.Attribute("rowsAffected", ra),
+	)
+	return ra, err
 }
 
 func (s *Session) Insert(obj interface{}) (int64, error) {
@@ -186,7 +192,7 @@ func (s *Session) insertBuilder(table string, updatefields []string, obj interfa
 	if len(updatefields) > 0 {
 		query += " on duplicate key update "
 		for _, v := range updatefields {
-			if strings.Index(v, "=") != -1 {
+			if strings.Contains(v, "=") {
 				query += fmt.Sprintf("%s,", v)
 			} else {
 				query += fmt.Sprintf("`%s` = values(`%s`),", v, v)
@@ -300,7 +306,7 @@ func (s *Session) Tx(fn func(*Session) error) error {
 		s.tx = nil
 	}()
 	if err = fn(s); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 	return tx.Commit()
