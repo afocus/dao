@@ -25,7 +25,7 @@ func CreateQueryContext(rows *sql.Rows, err error) *QueryContext {
 
 // Get 转换单行数据
 // 如果无结果 则返回sql.ErrNoRows
-func (c *QueryContext) Get(obj interface{}) (bool, error) {
+func (c *QueryContext) Get(obj any) (bool, error) {
 	if c.lastErr != nil {
 		return false, c.lastErr
 	}
@@ -37,7 +37,7 @@ func (c *QueryContext) Get(obj interface{}) (bool, error) {
 	}
 
 	v := reflect.ValueOf(obj)
-	if v.Kind() != reflect.Ptr {
+	if v.Kind() != reflect.Pointer {
 		return false, errorRowData
 	}
 
@@ -58,8 +58,8 @@ func (c *QueryContext) Get(obj interface{}) (bool, error) {
 }
 
 // Find 转换多行数据
-// obj 必须是slice类型 如[]struct []map[string]interface{}..
-func (c *QueryContext) Find(obj interface{}) error {
+// obj 必须是slice类型 如[]struct []map[string]any..
+func (c *QueryContext) Find(obj any) error {
 	if c.lastErr != nil {
 		return c.lastErr
 	}
@@ -69,7 +69,7 @@ func (c *QueryContext) Find(obj interface{}) error {
 		return err
 	}
 	v := reflect.ValueOf(obj)
-	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Slice {
+	if v.Kind() != reflect.Pointer || v.Elem().Kind() != reflect.Slice {
 		return errorRowsData
 	}
 	v = reflect.Indirect(v)

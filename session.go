@@ -12,21 +12,22 @@ import (
 )
 
 type Session struct {
-	uniq   string
-	dao    *Dao
-	indexs []string
-	table  string
-	fields []string
-	cond   *sessionCond
-	parts  []expPart
-	tx     *sql.Tx
+	uniq         string
+	dao          *Dao
+	useIndexs    []string
+	ignoreIndexs []string
+	table        string
+	fields       []string
+	cond         *sessionCond
+	parts        []expPart
+	tx           *sql.Tx
 
 	querySrcData *sqlData
 }
 
 type sqlData struct {
 	Query string
-	Args  []interface{}
+	Args  []any
 }
 
 type expPart struct {
@@ -45,12 +46,12 @@ func (e *expPart) String() string {
 }
 
 var sessions = &sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return &Session{}
 	},
 }
 
-func (s *Session) logOutput(query string, args interface{}, duration time.Duration) {
+func (s *Session) logOutput(query string, args any, duration time.Duration) {
 	if s.dao.logger != nil {
 		str := fmt.Sprintf("%s%s %v cost:%v", s.uniq, query, args, duration.Milliseconds())
 		s.dao.logger(str)
@@ -73,15 +74,29 @@ func (s *Session) UseIndex(index ...string) *Session {
 			index[k] = "`" + v + "`"
 		}
 	}
-	if s.indexs == nil {
-		s.indexs = index
+	if s.useIndexs == nil {
+		s.useIndexs = index
 	} else {
-		s.indexs = append(s.indexs, index...)
+		s.useIndexs = append(s.useIndexs, index...)
 	}
 	return s
 }
 
-func (s *Session) Where(query string, args ...interface{}) *Session {
+func (s *Session) IgnoreIndex(index ...string) *Session {
+	for k, v := range index {
+		if !strings.HasPrefix(v, "`") {
+			index[k] = "`" + v + "`"
+		}
+	}
+	if s.ignoreIndexs == nil {
+		s.ignoreIndexs = index
+	} else {
+		s.ignoreIndexs = append(s.ignoreIndexs, index...)
+	}
+	return s
+}
+
+func (s *Session) Where(query string, args ...any) *Session {
 	if s.cond != nil {
 		return s.And(query, args...)
 	}
@@ -89,12 +104,12 @@ func (s *Session) Where(query string, args ...interface{}) *Session {
 	return s
 }
 
-func (s *Session) And(query string, args ...interface{}) *Session {
+func (s *Session) And(query string, args ...any) *Session {
 	s.cond.And(query, args...)
 	return s
 }
 
-func (s *Session) Or(query string, args ...interface{}) *Session {
+func (s *Session) Or(query string, args ...any) *Session {
 	s.cond.Or(query, args...)
 	return s
 }
@@ -108,12 +123,13 @@ func (s *Session) reset() {
 	s.fields = nil
 	s.parts = nil
 	s.cond = nil
-	s.indexs = nil
+	s.useIndexs = nil
+	s.ignoreIndexs = nil
 	s.table = ""
 	s.querySrcData = nil
 }
 
-func (s *Session) Exec(query string, args ...interface{}) (int64, error) {
+func (s *Session) Exec(query string, args ...any) (int64, error) {
 	defer s.reset()
 	var (
 		ret sql.Result
@@ -133,7 +149,7 @@ func (s *Session) Exec(query string, args ...interface{}) (int64, error) {
 	return ret.RowsAffected()
 }
 
-func (s *Session) Insert(obj interface{}) (int64, error) {
+func (s *Session) Insert(obj any) (int64, error) {
 	query, args, err := s.insertBuilder(s.table, s.fields, obj)
 	if err != nil {
 		return 0, err
@@ -141,17 +157,17 @@ func (s *Session) Insert(obj interface{}) (int64, error) {
 	return s.Exec(query, args...)
 }
 
-func (s *Session) insertBuilder(table string, updatefields []string, obj interface{}) (string, []interface{}, error) {
+func (s *Session) insertBuilder(table string, updatefields []string, obj any) (string, []any, error) {
 
 	var (
 		fields []string
-		args   []interface{}
+		args   []any
 		skipPk = -1
 		sqltpl = "insert into %s(%s) values (%s)"
 		v      = reflect.Indirect(reflect.ValueOf(obj))
 	)
 
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 
@@ -189,7 +205,7 @@ func (s *Session) insertBuilder(table string, updatefields []string, obj interfa
 	if len(updatefields) > 0 {
 		query += " on duplicate key update "
 		for _, v := range updatefields {
-			if strings.Index(v, "=") != -1 {
+			if strings.Contains(v, "=") {
 				query += fmt.Sprintf("%s,", v)
 			} else {
 				query += fmt.Sprintf("`%s` = values(`%s`),", v, v)
@@ -205,9 +221,12 @@ func (s *Session) Delete() (int64, error) {
 		return 0, errors.New("tablename faild")
 	}
 	str := bytes.NewBuffer(nil)
-	str.WriteString(fmt.Sprintf("delete from %s", s.table))
-	if s.indexs != nil {
-		str.WriteString(fmt.Sprintf(" use index(%s)", strings.Join(s.indexs, ", ")))
+	fmt.Fprintf(str, "delete from %s", s.table)
+	if s.useIndexs != nil {
+		fmt.Fprintf(str, " use index(%s)", strings.Join(s.useIndexs, ", "))
+	}
+	if s.ignoreIndexs != nil {
+		fmt.Fprintf(str, " ignore index(%s)", strings.Join(s.ignoreIndexs, ", "))
 	}
 	condstr, condargs := s.cond.Build()
 	str.WriteString(condstr)
@@ -218,16 +237,16 @@ func (s *Session) Delete() (int64, error) {
 	return s.Exec(str.String(), condargs...)
 }
 
-func (s *Session) Update(obj interface{}) (int64, error) {
+func (s *Session) Update(obj any) (int64, error) {
 	v := reflect.Indirect(reflect.ValueOf(obj))
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 	var (
 		keys   []string
-		values []interface{}
+		values []any
 		str    = bytes.NewBuffer(nil)
-		args   = make([]interface{}, 0)
+		args   = make([]any, 0)
 		qort   = make([]string, 0)
 	)
 	switch v.Kind() {
@@ -238,9 +257,12 @@ func (s *Session) Update(obj interface{}) (int64, error) {
 	default:
 		return 0, errorParseData
 	}
-	str.WriteString(fmt.Sprintf("update %s", s.table))
-	if s.indexs != nil {
-		str.WriteString(fmt.Sprintf(" use index(%s)", strings.Join(s.indexs, ", ")))
+	fmt.Fprintf(str, "update %s", s.table)
+	if s.useIndexs != nil {
+		fmt.Fprintf(str, " use index(%s)", strings.Join(s.useIndexs, ", "))
+	}
+	if s.ignoreIndexs != nil {
+		fmt.Fprintf(str, " ignore index(%s)", strings.Join(s.ignoreIndexs, ", "))
 	}
 	str.WriteString(" set")
 	if v.Kind() == reflect.Struct {
@@ -303,7 +325,7 @@ func (s *Session) Tx(fn func(*Session) error) error {
 		s.tx = nil
 	}()
 	if err = fn(s); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 	return tx.Commit()

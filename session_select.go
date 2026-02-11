@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func (s *Session) Query(query string, args ...interface{}) *Session {
+func (s *Session) Query(query string, args ...any) *Session {
 	s.querySrcData = &sqlData{Query: query, Args: args}
 	return s
 }
@@ -64,16 +64,16 @@ func (s *Session) queryCtx() *QueryContext {
 	return result
 }
 
-func (s *Session) Find(obj interface{}) error {
+func (s *Session) Find(obj any) error {
 	return s.queryCtx().Find(obj)
 }
 
-func (s *Session) Get(obj interface{}) (bool, error) {
+func (s *Session) Get(obj any) (bool, error) {
 	s.Limit(1)
 	return s.queryCtx().Get(obj)
 }
 
-func (s *Session) buildQuery() (string, []interface{}) {
+func (s *Session) buildQuery() (string, []any) {
 	if s.querySrcData != nil {
 		return s.querySrcData.Query, s.querySrcData.Args
 	}
@@ -85,9 +85,12 @@ func (s *Session) buildQuery() (string, []interface{}) {
 		cols = strings.Join(s.fields, ", ")
 	}
 	str := bytes.NewBuffer(nil)
-	str.WriteString(fmt.Sprintf("select %s from %s", cols, s.table))
-	if s.indexs != nil {
-		str.WriteString(fmt.Sprintf(" use index(%s)", strings.Join(s.indexs, ", ")))
+	fmt.Fprintf(str, "select %s from %s", cols, s.table)
+	if s.useIndexs != nil {
+		fmt.Fprintf(str, " use index(%s)", strings.Join(s.useIndexs, ", "))
+	}
+	if s.ignoreIndexs != nil {
+		fmt.Fprintf(str, " ignore index(%s)", strings.Join(s.ignoreIndexs, ", "))
 	}
 	condstr, condargs := s.cond.Build()
 	str.WriteString(condstr)

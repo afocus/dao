@@ -87,14 +87,14 @@ type rtStructCache map[string]structFieldInfo
 
 func scanMap(v reflect.Value, cols []string, rows *sql.Rows) error {
 	// map的具体类型
-	args := make([]interface{}, len(cols))
+	args := make([]any, len(cols))
 	t := v.Type().Elem()
 	var isMapString bool
 	if t.Kind() == reflect.String {
 		// 如果是map[string]string
 		// 则需要转为[]byte,否则如果数据包含null则会报错 转成[]byte则null会转为空字符串
 		isMapString = true
-		t = reflect.TypeOf(sql.RawBytes{})
+		t = reflect.TypeFor[sql.RawBytes]()
 	}
 	for i := range cols {
 		args[i] = reflect.New(t).Interface()
@@ -116,7 +116,7 @@ func scanMap(v reflect.Value, cols []string, rows *sql.Rows) error {
 }
 
 func scanStruct(v reflect.Value, cols []string, rows *sql.Rows) error {
-	args := make([]interface{}, len(cols))
+	args := make([]any, len(cols))
 	fields := globalRtCache.Get(v)
 
 	// tmpbuf 返回的字段数多于结构体的字段数是代替
@@ -127,7 +127,7 @@ func scanStruct(v reflect.Value, cols []string, rows *sql.Rows) error {
 	defer func() {
 		for k, fi := range jsondata {
 			if x := args[fi]; x != nil {
-				json.Unmarshal(*(x.(*[]byte)), v.FieldByName(k).Addr().Interface())
+				_ = json.Unmarshal(*(x.(*[]byte)), v.FieldByName(k).Addr().Interface())
 			}
 		}
 	}()
@@ -146,11 +146,11 @@ func scanStruct(v reflect.Value, cols []string, rows *sql.Rows) error {
 	return rows.Scan(args...)
 }
 
-func parseStruct(v reflect.Value) ([]string, []interface{}) {
+func parseStruct(v reflect.Value) ([]string, []any) {
 	var (
 		fields = globalRtCache.Get(v)
 		names  []string
-		args   []interface{}
+		args   []any
 	)
 	for name, f := range fields {
 		val := v.FieldByName(f.name).Interface()
@@ -165,10 +165,10 @@ func parseStruct(v reflect.Value) ([]string, []interface{}) {
 	return names, args
 }
 
-func parseMap(v reflect.Value) ([]string, []interface{}) {
+func parseMap(v reflect.Value) ([]string, []any) {
 	var (
 		names []string
-		args  []interface{}
+		args  []any
 	)
 	lt := v.MapRange()
 	for lt.Next() {

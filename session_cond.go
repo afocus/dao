@@ -8,34 +8,34 @@ import (
 
 type sessionCond struct {
 	strb *strings.Builder
-	args []interface{}
+	args []any
 }
 
-func newSessionCond(query string, args ...interface{}) *sessionCond {
+func newSessionCond(query string, args ...any) *sessionCond {
 	s := &sessionCond{
 		strb: &strings.Builder{},
-		args: make([]interface{}, 0),
+		args: make([]any, 0),
 	}
 	s.addPart("where", query, args...)
 	return s
 }
 
-func (s *sessionCond) And(query string, args ...interface{}) {
+func (s *sessionCond) And(query string, args ...any) {
 	s.addPart("and", query, args...)
 }
 
-func (s *sessionCond) Or(query string, args ...interface{}) {
+func (s *sessionCond) Or(query string, args ...any) {
 	s.addPart("or", query, args...)
 }
 
-func (s *sessionCond) addPart(cmd string, query string, args ...interface{}) {
+func (s *sessionCond) addPart(cmd string, query string, args ...any) {
 	query, args = placeholderExpansion(query, args)
-	s.strb.WriteString(fmt.Sprintf(" %s ", cmd))
-	s.strb.WriteString(fmt.Sprintf("( %s )", query))
+	fmt.Fprintf(s.strb, " %s ", cmd)
+	fmt.Fprintf(s.strb, "( %s )", query)
 	s.args = append(s.args, args...)
 }
 
-func (s *sessionCond) Build() (string, []interface{}) {
+func (s *sessionCond) Build() (string, []any) {
 	return s.strb.String(), s.args
 }
 
@@ -46,9 +46,9 @@ func parseSQLArgsInSlice(count int) string {
 
 // placeholderExpansion 占位符展开
 // where name = ? and id in (?)  ["afocus", []{1,3,4,5}] 展开为 where name = ? and id in (?,?,?,?)  ["afocus", 1,3,4,5]
-func placeholderExpansion(query string, args []interface{}) (string, []interface{}) {
+func placeholderExpansion(query string, args []any) (string, []any) {
 	var (
-		values []interface{}
+		values []any
 		ns     []byte
 		n      int
 	)
